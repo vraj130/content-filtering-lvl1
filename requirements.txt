@@ -1,0 +1,13 @@
+transformers
+peft
+datasets
+accelerate
+scikit-learn
+bitsandbytes
+flash-attn
+huggingface-hub
+evaluate
+pandas
+pyyaml
+wandb
+requests

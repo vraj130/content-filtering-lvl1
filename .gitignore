@@ -1,0 +1,50 @@
+# Data
+data/
+*.parquet
+
+# Models
+models/*
+!models/.gitkeep
+outputs/checkpoints/*
+outputs/tensorboard/*
+outputs/logs/*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Weights & Biases
+wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+#Cursor files
+.cursor/

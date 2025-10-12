@@ -1,0 +1,108 @@
+# Training Configuration for Content Filtering LV1 - Binary Classifier
+# Stage 1: High-recall AI content detection
+
+# Model Configuration
+model:
+  hugging_face_model_id: "google/gemma-3-1b-it"
+  num_labels: 2
+  max_length: 8192
+  attention_implementation: "flash_attention_2"
+
+# Class Labels
+class_mapping:
+  nonai: 0
+  ai: 1
+
+# GPU Configuration
+gpu:
+  graphic_card: "0"
+  gpu_device: "cuda:0"
+
+# Quantization Configuration
+quantization:
+  load_in_4bit: true
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+
+# LoRA Configuration
+lora:
+  r: 64
+  lora_alpha: 32
+  lora_dropout: 0.1
+  bias: "none"
+  task_type: "SEQ_CLS"
+  target_modules:
+    - "gate_proj"
+    - "down_proj"
+    - "v_proj"
+    - "k_proj"
+    - "q_proj"
+    - "o_proj"
+    - "up_proj"
+
+# Training Arguments
+training:
+  output_dir: "outputs/checkpoints/gemma3_binary_classifier"
+  learning_rate: 5.0e-5
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  num_train_epochs: 5
+  weight_decay: 0.01
+  eval_strategy: "steps"
+  eval_steps: 1000
+  save_strategy: "steps"
+  save_steps: 1000
+  load_best_model_at_end: true
+  push_to_hub: false
+  logging_strategy: "steps"
+  logging_steps: 50
+  gradient_accumulation_steps: 4
+  bf16: true
+  fp16: false
+  warmup_ratio: 0.05
+  metric_for_best_model: "eval_ai_recall"
+  greater_is_better: true
+  gradient_checkpointing: true
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  dataloader_prefetch_factor: 2
+
+# Early Stopping
+early_stopping:
+  patience: 3
+  threshold: 0.001
+
+# Class Weights
+class_weights:
+  use_balanced: true
+
+# Threshold Optimization
+threshold:
+  target_recall: 0.98
+
+# Output Configuration
+output:
+  model_dir: "models/gemma3_binary_model_final"
+  checkpoints_dir: "outputs/checkpoints/gemma3_binary_classifier"
+  tensorboard_dir: "outputs/tensorboard/gemma3_binary_classifier"
+
+# Data Configuration
+data:
+  data_dir: "/workspace/unified_data/gemma_format"
+  train_file: "train.csv"
+  val_file: "val.csv"
+  test_file: "test.csv"
+
+# Weights & Biases Configuration
+wandb:
+  enabled: true
+  project: "gemma-classifier_training v2"
+  run_name: "gemma3-1b-lora-8k"
+  api_key: "YOUR_WANDB_API_KEY"  # Replace with your Weights & Biases API key
+
+# Slack Notifications
+slack:
+  enabled: false
+  webhook_url: "YOUR_SLACK_WEBHOOK_URL"  # Replace with your Slack webhook URL if enabling notifications
+
