@@ -105,4 +105,3 @@ wandb:
 slack:
   enabled: false
   webhook_url: "YOUR_SLACK_WEBHOOK_URL"  # Replace with your Slack webhook URL if enabling notifications
-

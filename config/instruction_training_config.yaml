@@ -1,0 +1,129 @@
+# Training Configuration for Content Filtering LV1 - Instruction Fine-Tuning
+# Stage 1: High-recall AI content detection using instruction-based approach
+
+# Model Configuration
+model:
+  hugging_face_model_id: "google/gemma-3-1b-it"
+  max_length: 8192
+  attention_implementation: "flash_attention_2"
+
+quick_test: False
+# Class Labels
+class_mapping:
+  nonai: 0
+  ai: 1
+
+# Instruction Prompting Configuration
+instruction:
+  prompt_template: |
+    <start_of_turn>user
+    Does this document discuss topics related to artificial intelligence or machine learning?
+    
+    Consider AI-related if the document discusses:
+    - Machine learning models, neural networks, or deep learning
+    - Model training, fine-tuning, or inference
+    - AI applications: language models, computer vision, robotics, speech recognition
+    - AI techniques: reinforcement learning, supervised learning, transfer learning
+    - AI concepts: embeddings, attention mechanisms, transformers, parameters, gradients
+    - AI safety, alignment, constitutional AI, or RLHF
+    - Autonomous systems that use learning algorithms
+    - Generative models or AI-generated content
+    - LLMs, GPT, BERT, or similar model architectures
+    - Autonomous systems, autonomous vehicles, or autonomous robots
+    - Prompt engineering, few-shot learning, or chain-of-thought reasoning
+    
+    Answer "Yes" even if AI/ML terms are not explicitly mentioned, as long as the content clearly discusses these concepts.
+    Answer "No" only if the content is unrelated to AI/ML technologies.
+    
+    Answer only "Yes" or "No".
+    
+    Document: {text}<end_of_turn>
+    <start_of_turn>model
+    
+  answer_yes: "Yes"
+  answer_no: "No"
+
+# GPU Configuration
+gpu:
+  graphic_card: "0"
+  gpu_device: "cuda:0"
+
+# Quantization Configuration
+quantization:
+  load_in_4bit: true
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+
+# LoRA Configuration
+lora:
+  r: 32
+  lora_alpha: 32
+  lora_dropout: 0.1
+  bias: "none"
+  task_type: "CAUSAL_LM" 
+  target_modules:
+    - "gate_proj"
+    - "down_proj"
+    - "v_proj"
+    - "k_proj"
+    - "q_proj"
+    - "o_proj"
+    - "up_proj"
+
+# Training Arguments
+training:
+  checkpoint_name: "gemma3_instruction_tune_v1"
+  output_dir: "outputs/checkpoints/${checkpoint_name}/checkpoints"
+  learning_rate: 2.0e-5  # Lower LR for instruction tuning
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 4
+  num_train_epochs: 1
+  weight_decay: 0.01
+  eval_strategy: "steps"
+  eval_steps: 900
+  save_strategy: "steps"
+  save_steps: 900
+  load_best_model_at_end: true
+  push_to_hub: false
+  logging_strategy: "steps"
+  logging_steps: 50
+  gradient_accumulation_steps: 4
+  bf16: true
+  fp16: false
+  warmup_ratio: 0.1
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  gradient_checkpointing: true
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  dataloader_prefetch_factor: 2
+
+# Early Stopping
+early_stopping:
+  patience: 1
+  threshold: 0.001
+
+# Output Configuration
+output:
+  model_dir: "outputs/checkpoints/${checkpoint_name}/final_model"
+  tensorboard_dir: "outputs/tensorboard/${checkpoint_name}"
+
+# Data Configuration
+data:
+  data_dir: "/workspace/content-filtering-lvl1/data/gemma_format"
+  train_file: "train.csv"
+  val_file: "val.csv"
+  test_file: "test.csv"
+
+# Weights & Biases Configuration
+wandb:
+  enabled: true
+  project: "gemma-instruction_training-v2"
+  run_name: "gemma3-1b-instruction-8k"
+  api_key: ${WANDB_API_KEY}
+
+# Slack Notifications
+slack:
+  enabled: true
+  webhook_url: ${SLACK_WEBHOOK_URL}
