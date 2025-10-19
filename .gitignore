@@ -23,11 +23,11 @@ build/
 .ipynb_checkpoints/
 
 # Environment
-.env
 .venv
 env/
 venv/
 ENV/
+.env
 
 # Weights & Biases
 wandb/
