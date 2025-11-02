@@ -48,3 +48,6 @@ Thumbs.db
 
 #Cursor files
 .cursor/
+
+#outputs and checkpoints
+outputs/

@@ -19,7 +19,7 @@ from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
 from transformers import (AutoTokenizer, BitsAndBytesConfig, TrainingArguments,
                          Trainer, EarlyStoppingCallback, DataCollatorForLanguageModeling, DataCollatorWithPadding,
                          AutoModelForCausalLM, TrainerCallback)
-from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support, accuracy_score, roc_auc_score
 
 
 load_dotenv()
@@ -258,10 +258,24 @@ class InstructionFineTuner:
         self.logger.info("Loading datasets...")
         data_dir = self.config['data']['data_dir']
         self.logger.info(f"Data directory: {data_dir}")
+
+        # Auto-detect file format
+        train_file = f"{data_dir}/{self.config['data']['train_file']}"
+        val_file = f"{data_dir}/{self.config['data']['val_file']}"
+        test_file = f"{data_dir}/{self.config['data']['test_file']}"
         
-        train_df = pd.read_csv(f"{data_dir}/{self.config['data']['train_file']}")
-        val_df = pd.read_csv(f"{data_dir}/{self.config['data']['val_file']}")
-        test_df = pd.read_csv(f"{data_dir}/{self.config['data']['test_file']}")
+        # Function to read file based on extension
+        def read_file(filepath):
+            if filepath.endswith('.parquet'):
+                return pd.read_parquet(filepath)
+            elif filepath.endswith('.csv'):
+                return pd.read_csv(filepath)
+            else:
+                raise ValueError(f"Unsupported file format: {filepath}")
+        
+        train_df = read_file(train_file)
+        val_df = read_file(val_file)
+        test_df = read_file(test_file)
         
         print(f"✅ Loaded unified dataset:")
         print(f"   Train: {len(train_df)} samples")
@@ -778,6 +792,47 @@ class InstructionFineTuner:
         self.logger.info(f"Actual non-AI   {cm[0,0]:<9} {cm[0,1]}")
         self.logger.info(f"Actual AI       {cm[1,0]:<9} {cm[1,1]}")
         
+        # Compute overall accuracy
+        accuracy = accuracy_score(true_labels, predictions)
+        print(f"\nOverall Accuracy: {accuracy:.4f}")
+        self.logger.info(f"Overall Accuracy: {accuracy:.4f}")
+        
+        # Compute ROC-AUC score
+        try:
+            roc_auc = roc_auc_score(true_labels, confidences)
+            print(f"ROC-AUC Score: {roc_auc:.4f}")
+            self.logger.info(f"ROC-AUC Score: {roc_auc:.4f}")
+        except Exception as e:
+            roc_auc = None
+            print(f"⚠️ Could not compute ROC-AUC: {e}")
+            self.logger.warning(f"Could not compute ROC-AUC: {e}")
+        
+        # Confidence analysis
+        print(f"\n📊 Confidence Analysis:")
+        self.logger.info("Confidence Analysis:")
+        
+        correct_predictions = [i for i in range(len(predictions)) if predictions[i] == true_labels[i]]
+        incorrect_predictions = [i for i in range(len(predictions)) if predictions[i] != true_labels[i]]
+        
+        correct_confidences = [confidences[i] for i in correct_predictions]
+        incorrect_confidences = [confidences[i] for i in incorrect_predictions]
+        
+        mean_conf_correct = np.mean(correct_confidences) if correct_confidences else 0.0
+        mean_conf_incorrect = np.mean(incorrect_confidences) if incorrect_confidences else 0.0
+        mean_conf_overall = np.mean(confidences)
+        
+        print(f"   Mean confidence (correct predictions): {mean_conf_correct:.4f}")
+        print(f"   Mean confidence (incorrect predictions): {mean_conf_incorrect:.4f}")
+        print(f"   Mean confidence (overall): {mean_conf_overall:.4f}")
+        print(f"   Correct predictions: {len(correct_predictions)}/{len(predictions)} ({len(correct_predictions)/len(predictions)*100:.1f}%)")
+        print(f"   Incorrect predictions: {len(incorrect_predictions)}/{len(predictions)} ({len(incorrect_predictions)/len(predictions)*100:.1f}%)")
+        
+        self.logger.info(f"  Mean confidence (correct): {mean_conf_correct:.4f}")
+        self.logger.info(f"  Mean confidence (incorrect): {mean_conf_incorrect:.4f}")
+        self.logger.info(f"  Mean confidence (overall): {mean_conf_overall:.4f}")
+        self.logger.info(f"  Correct: {len(correct_predictions)}/{len(predictions)} ({len(correct_predictions)/len(predictions)*100:.1f}%)")
+        self.logger.info(f"  Incorrect: {len(incorrect_predictions)}/{len(predictions)} ({len(incorrect_predictions)/len(predictions)*100:.1f}%)")
+        
         # Compute per-class metrics
         precision, recall, f1, _ = precision_recall_fscore_support(
             true_labels, predictions, labels=[0, 1], zero_division=0
@@ -792,12 +847,17 @@ class InstructionFineTuner:
         self.logger.info(f"AI:     Precision={precision[1]:.4f}, Recall={recall[1]:.4f}, F1={f1[1]:.4f}")
         
         return {
+            'accuracy': accuracy,
+            'roc_auc': roc_auc,
             'ai_recall': recall[1],
             'ai_precision': precision[1],
             'ai_f1': f1[1],
             'nonai_recall': recall[0],
             'nonai_precision': precision[0],
             'nonai_f1': f1[0],
+            'mean_confidence_correct': mean_conf_correct,
+            'mean_confidence_incorrect': mean_conf_incorrect,
+            'mean_confidence_overall': mean_conf_overall,
             'chunk_stats': chunk_stats
         }
 
@@ -860,18 +920,22 @@ class InstructionFineTuner:
         
         # Notifications
         notification_message = f"""
-🎉 *Instruction Fine-Tuning Completed!*
+            🎉 *Instruction Fine-Tuning Completed!*
 
-📊 *Final Results:*
-- Epochs completed: {self.trainer.state.epoch}
-- AI Recall: {test_metrics['ai_recall']:.4f}
-- AI Precision: {test_metrics['ai_precision']:.4f}
-- AI F1: {test_metrics['ai_f1']:.4f}
+            📊 *Final Results:*
+            - Epochs completed: {self.trainer.state.epoch}
+            - Overall Accuracy: {test_metrics['accuracy']:.4f}
+            - ROC-AUC: {test_metrics['roc_auc']:.4f if test_metrics['roc_auc'] else 'N/A'}
+            - AI Recall: {test_metrics['ai_recall']:.4f}
+            - AI Precision: {test_metrics['ai_precision']:.4f}
+            - AI F1: {test_metrics['ai_f1']:.4f}
+            - Mean Confidence (Correct): {test_metrics['mean_confidence_correct']:.4f}
+            - Mean Confidence (Incorrect): {test_metrics['mean_confidence_incorrect']:.4f}
 
-💾 *Model saved to:* `{self.config['output']['model_dir']}`
+            💾 *Model saved to:* `{self.config['output']['model_dir']}`
 
 
-"""
+            """
         self.notify_slack(notification_message)
         
         # Log to wandb

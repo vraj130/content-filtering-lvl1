@@ -7,7 +7,7 @@ model:
   max_length: 8192
   attention_implementation: "flash_attention_2"
 
-quick_test: False
+quick_test: false
 # Class Labels
 class_mapping:
   nonai: 0
@@ -16,29 +16,14 @@ class_mapping:
 # Instruction Prompting Configuration
 instruction:
   prompt_template: |
-    <start_of_turn>user
-    Does this document discuss topics related to artificial intelligence or machine learning?
-    
-    Consider AI-related if the document discusses:
-    - Machine learning models, neural networks, or deep learning
-    - Model training, fine-tuning, or inference
-    - AI applications: language models, computer vision, robotics, speech recognition
-    - AI techniques: reinforcement learning, supervised learning, transfer learning
-    - AI concepts: embeddings, attention mechanisms, transformers, parameters, gradients
-    - AI safety, alignment, constitutional AI, or RLHF
-    - Autonomous systems that use learning algorithms
-    - Generative models or AI-generated content
-    - LLMs, GPT, BERT, or similar model architectures
-    - Autonomous systems, autonomous vehicles, or autonomous robots
-    - Prompt engineering, few-shot learning, or chain-of-thought reasoning
-    
-    Answer "Yes" even if AI/ML terms are not explicitly mentioned, as long as the content clearly discusses these concepts.
-    Answer "No" only if the content is unrelated to AI/ML technologies.
-    
-    Answer only "Yes" or "No".
-    
-    Document: {text}<end_of_turn>
-    <start_of_turn>model
+    Does the following text include anything related to AI or LLMs?
+    If so, output 'Yes'. Otherwise, output 'No'.
+
+    <text>
+    {text}
+    </text>
+
+    Remember to only output a single token: 'Yes' or 'No'.
     
   answer_yes: "Yes"
   answer_no: "No"
@@ -50,16 +35,16 @@ gpu:
 
 # Quantization Configuration
 quantization:
-  load_in_4bit: true
+  load_in_4bit: false
   bnb_4bit_use_double_quant: true
   bnb_4bit_quant_type: "nf4"
   bnb_4bit_compute_dtype: "bfloat16"
 
 # LoRA Configuration
 lora:
-  r: 32
-  lora_alpha: 32
-  lora_dropout: 0.1
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.2
   bias: "none"
   task_type: "CAUSAL_LM" 
   target_modules:
@@ -73,21 +58,21 @@ lora:
 
 # Training Arguments
 training:
-  checkpoint_name: "gemma3_instruction_tune_v1"
-  output_dir: "outputs/checkpoints/${checkpoint_name}/checkpoints"
+  checkpoint_name: "gemma3_20k_balanced_it"
+  output_dir: "outputs/checkpoints/${{checkpoint_name}}/checkpoints"
   learning_rate: 2.0e-5  # Lower LR for instruction tuning
-  per_device_train_batch_size: 2
-  per_device_eval_batch_size: 4
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 2
   num_train_epochs: 1
   weight_decay: 0.01
   eval_strategy: "steps"
-  eval_steps: 900
+  eval_steps: 1500
   save_strategy: "steps"
-  save_steps: 900
+  save_steps: 1500
   load_best_model_at_end: true
   push_to_hub: false
   logging_strategy: "steps"
-  logging_steps: 50
+  logging_steps: 100
   gradient_accumulation_steps: 4
   bf16: true
   fp16: false
@@ -111,16 +96,16 @@ output:
 
 # Data Configuration
 data:
-  data_dir: "/workspace/content-filtering-lvl1/data/gemma_format"
-  train_file: "train.csv"
-  val_file: "val.csv"
-  test_file: "test.csv"
+  data_dir: "/workspace/content-filtering-lvl1/data/final_data_4/train_all_data"
+  train_file: "train.parquet"
+  val_file: "val.parquet"
+  test_file: "test.parquet"
 
 # Weights & Biases Configuration
 wandb:
   enabled: true
-  project: "gemma-instruction_training-v2"
-  run_name: "gemma3-1b-instruction-8k"
+  project: "gemma-v3-20k-it"
+  run_name: "gemma3-1b-20k-balanced-it"
   api_key: ${WANDB_API_KEY}
 
 # Slack Notifications
