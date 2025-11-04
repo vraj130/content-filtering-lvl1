@@ -27,7 +27,7 @@ build/
 env/
 venv/
 ENV/
-.env
+*.env
 
 # Weights & Biases
 wandb/
@@ -50,4 +50,3 @@ Thumbs.db
 .cursor/
 
 #outputs and checkpoints
-outputs/

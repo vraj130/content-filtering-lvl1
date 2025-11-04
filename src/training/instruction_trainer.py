@@ -27,10 +27,7 @@ load_dotenv()
 
 @dataclass
 class DataCollatorForInstructionTuning:
-    """
-    Data collator for instruction fine-tuning
-    Pads input_ids, attention_mask, and labels to the same length
-    """
+
     tokenizer: PreTrainedTokenizerBase
     padding: bool = True
     max_length: int = None
@@ -38,13 +35,10 @@ class DataCollatorForInstructionTuning:
     return_tensors: str = "pt"
     
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
-        # Extract labels first (before padding)
         labels = [feature["labels"] for feature in features] if "labels" in features[0] else None
         
-        # Remove labels from features for padding
         features_without_labels = [{k: v for k, v in f.items() if k != "labels"} for f in features]
         
-        # Pad input_ids and attention_mask
         batch = self.tokenizer.pad(
             features_without_labels,
             padding=self.padding,
@@ -53,11 +47,9 @@ class DataCollatorForInstructionTuning:
             return_tensors=self.return_tensors,
         )
         
-        # Pad labels manually
         if labels is not None:
             max_label_length = max(len(l) for l in labels)
             
-            # Pad labels with -100 (ignore index)
             padded_labels = []
             for label in labels:
                 padding_length = max_label_length - len(label)
@@ -106,7 +98,6 @@ class TrainingLoggingCallback(TrainerCallback):
         self.logger.info(f"\nEpoch {int(state.epoch)}/{args.num_train_epochs} Completed")
         self.logger.info(f"Epoch time: {epoch_time:.2f} seconds ({epoch_time/60:.2f} minutes)")
         
-        # Log training loss if available
         if state.log_history:
             for log in reversed(state.log_history):
                 if 'loss' in log and 'epoch' in log:
@@ -129,15 +120,9 @@ class TrainingLoggingCallback(TrainerCallback):
 
 
 class InstructionFineTuner:
-    """Training pipeline for Gemma3 instruction-based binary classifier"""
     
     def __init__(self, config):
-        """
-        Initialize trainer with configuration
         
-        Args:
-            config: Dictionary containing all configuration parameters
-        """
         self.config = config
         self.device = None
         self.tokenizer = None
@@ -163,22 +148,17 @@ class InstructionFineTuner:
     
     def setup_logging(self):
         """Setup comprehensive logging to both console and file"""
-        # Create logs directory if it doesn't exist
         log_dir = "outputs/logs"
         os.makedirs(log_dir, exist_ok=True)
         
-        # Create log filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = os.path.join(log_dir, f"instruction_training_{timestamp}.log")
         
-        # Create logger
         self.logger = logging.getLogger('InstructionFineTuner')
         self.logger.setLevel(logging.INFO)
         
-        # Remove existing handlers to avoid duplicates
         self.logger.handlers.clear()
         
-        # Create formatters
         detailed_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
@@ -188,19 +168,16 @@ class InstructionFineTuner:
             datefmt='%H:%M:%S'
         )
         
-        # File handler (detailed logging)
         file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(detailed_formatter)
         self.logger.addHandler(file_handler)
         
-        # Console handler (less verbose)
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(console_formatter)
         self.logger.addHandler(console_handler)
         
-        # Log initial setup information
         self.logger.info("="*80)
         self.logger.info("Logging Initialized - Instruction Fine-Tuning")
         self.logger.info("="*80)
@@ -240,15 +217,12 @@ class InstructionFineTuner:
         Returns:
             Formatted prompt string
         """
-        # Get prompt template from config
         prompt_template = self.config['instruction']['prompt_template']
         
         if label is not None:
-            # Training: include the answer
             answer = self.config['instruction']['answer_yes'] if label == 1 else self.config['instruction']['answer_no']
             prompt = f"{prompt_template.format(text=text)}{answer}<end_of_turn>"
         else:
-            # Inference: just the question
             prompt = prompt_template.format(text=text)
         
         return prompt
@@ -259,12 +233,10 @@ class InstructionFineTuner:
         data_dir = self.config['data']['data_dir']
         self.logger.info(f"Data directory: {data_dir}")
 
-        # Auto-detect file format
         train_file = f"{data_dir}/{self.config['data']['train_file']}"
         val_file = f"{data_dir}/{self.config['data']['val_file']}"
         test_file = f"{data_dir}/{self.config['data']['test_file']}"
         
-        # Function to read file based on extension
         def read_file(filepath):
             if filepath.endswith('.parquet'):
                 return pd.read_parquet(filepath)
@@ -291,27 +263,23 @@ class InstructionFineTuner:
             print(f"\n⚡⚡⚡ QUICK TEST MODE ENABLED ⚡⚡⚡")
             print(f"   Original sizes: train={len(train_df)}, val={len(val_df)}, test={len(test_df)}")
             
-            # Use tiny subsets - stratified by label to maintain class balance
             train_df = train_df.groupby('label', group_keys=False).apply(
-                lambda x: x.head(25)  # 25 per class = 50 total
+                lambda x: x.head(25)  
             ).reset_index(drop=True)
             
             val_df = val_df.groupby('label', group_keys=False).apply(
-                lambda x: x.head(10)  # 10 per class = 20 total
+                lambda x: x.head(10) 
             ).reset_index(drop=True)
             
             test_df = test_df.groupby('label', group_keys=False).apply(
-                lambda x: x.head(10)  # 10 per class = 20 total
+                lambda x: x.head(10)  
             ).reset_index(drop=True)
             
             print(f"   Test subset sizes: train={len(train_df)}, val={len(val_df)}, test={len(test_df)}")
-            print(f"   ⚠️  This is ONLY for testing the pipeline, not real training!")
-            self.logger.warning("QUICK TEST MODE: Using tiny stratified data subset")
+            self.logger.warning("TEST: Using small stratified data subset")
 
         
-        # Format data with prompts
         self.logger.info("Formatting data with instruction prompts...")
-        print(f"\n🎯 Formatting data with instruction prompts...")
         
         for df in [train_df, val_df, test_df]:
             df['prompted_text'] = df.apply(
@@ -319,8 +287,6 @@ class InstructionFineTuner:
                 axis=1
             )
         
-        # Verify label distribution
-        print(f"\n🏷️  Label distribution:")
         self.logger.info("Label distribution:")
         for split_name, split_df in [('Train', train_df), ('Valid', val_df), ('Test', test_df)]:
             ai_count = (split_df['label'] == 1).sum()
@@ -328,7 +294,6 @@ class InstructionFineTuner:
             print(f"   {split_name}: non-AI={nonai_count} ({nonai_count/len(split_df)*100:.1f}%), AI={ai_count} ({ai_count/len(split_df)*100:.1f}%)")
             self.logger.info(f"  {split_name}: non-AI={nonai_count} ({nonai_count/len(split_df)*100:.1f}%), AI={ai_count} ({ai_count/len(split_df)*100:.1f}%)")
         
-        # Convert to Hugging Face Dataset
         self.dataset = DatasetDict({
             'train': Dataset.from_pandas(train_df),
             'valid': Dataset.from_pandas(val_df),
@@ -338,8 +303,7 @@ class InstructionFineTuner:
         print(f"\nDataset loaded:\n{self.dataset}")
         self.logger.info("Dataset conversion to HuggingFace format complete")
         
-        # Log example prompt
-        print(f"\n📝 Example prompt (first 500 chars):")
+        print(f"\n Example prompt (first 500 chars):")
         example_prompt = train_df['prompted_text'].iloc[0]
         print(example_prompt[:500])
         self.logger.info("Example prompt:")
@@ -370,7 +334,6 @@ class InstructionFineTuner:
         
         def preprocess_function(sample):
             """Tokenize and create labels with -100 masking"""
-            # Tokenize the full prompted text
             tokenized = self.tokenizer(
                 sample['prompted_text'], 
                 truncation=True, 
@@ -378,19 +341,14 @@ class InstructionFineTuner:
                 padding=False  # Pad in collator
             )
             
-            # Create labels - copy of input_ids
             labels = tokenized['input_ids'].copy()
             
-            # Find where the answer starts
-            # We need to mask everything before the answer
             answer_yes = self.config['instruction']['answer_yes']
             answer_no = self.config['instruction']['answer_no']
             
-            # Tokenize answers to find their token IDs
             yes_tokens = self.tokenizer.encode(answer_yes, add_special_tokens=False)
             no_tokens = self.tokenizer.encode(answer_no, add_special_tokens=False)
             
-            # Find where answer starts in the sequence
             answer_start_idx = None
             for i in range(len(labels) - max(len(yes_tokens), len(no_tokens))):
                 if (labels[i:i+len(yes_tokens)] == yes_tokens or 
@@ -398,7 +356,6 @@ class InstructionFineTuner:
                     answer_start_idx = i
                     break
             
-            # Mask everything before the answer with -100
             if answer_start_idx is not None:
                 labels[:answer_start_idx] = [-100] * answer_start_idx
             else:
@@ -445,7 +402,6 @@ class InstructionFineTuner:
         self.logger.info("Base model loaded successfully")
         print(f"✅ Base model loaded (architecture unchanged)")
         
-        # DO NOT replace lm_head - this is the key difference from classification approach
         self.logger.info("Keeping original lm_head for language modeling")
     
     def setup_lora(self):
@@ -491,7 +447,6 @@ class InstructionFineTuner:
             early_stopping_threshold=self.config['early_stopping']['threshold']
         )
         
-        # Create logging callback
         logging_callback = TrainingLoggingCallback(self.logger)
         
         training_args = TrainingArguments(
@@ -523,7 +478,6 @@ class InstructionFineTuner:
             dataloader_prefetch_factor=self.config['training']['dataloader_prefetch_factor']
         )
         
-        # Use DataCollatorForLanguageModeling for instruction tuning
         data_collator = DataCollatorForInstructionTuning(
             tokenizer=self.tokenizer,
             padding=True
@@ -561,24 +515,20 @@ class InstructionFineTuner:
     
     def _predict_single_chunk(self, text_chunk):
 
-    # Create prompt
         prompt = self.create_prompt(text_chunk, label=None)
         
-        # Tokenize
         inputs = self.tokenizer(
             prompt, 
             return_tensors="pt", 
             truncation=True, 
-            max_length=32000  # Use larger context for inference
+            max_length=32000  # 
         ).to(self.device)
         
-        # Get token IDs for Yes/No
         yes_tokens = self.tokenizer.encode("Yes", add_special_tokens=False)
         no_tokens = self.tokenizer.encode("No", add_special_tokens=False)
         yes_token_id = yes_tokens[0]
         no_token_id = no_tokens[0]
         
-        # Generate with constrained decoding (single token)
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -589,17 +539,13 @@ class InstructionFineTuner:
                 do_sample=False
             )
         
-        # Get logits for Yes/No tokens
         first_token_logits = outputs.scores[0][0]
         yes_score = first_token_logits[yes_token_id].item()
         no_score = first_token_logits[no_token_id].item()
-        
-        # Calculate probabilities
        
         probs = F.softmax(torch.tensor([no_score, yes_score]), dim=0)
         yes_prob = probs[1].item()
         
-        # Predict: 1 if yes_score > no_score, else 0
         predicted_class = 1 if yes_score > no_score else 0
         confidence = yes_prob if predicted_class == 1 else (1 - yes_prob)
         
@@ -618,15 +564,13 @@ class InstructionFineTuner:
         Returns:
             tuple: (predicted_class_label, answer_string, confidence, chunk_info)
         """
-        # Configuration
-        max_chunk_tokens = 30000  # Much larger than training (8192)
-        overlap_tokens = 2000     # Overlap between chunks
+
+        max_chunk_tokens = 30000  
+        overlap_tokens = 2000  
         
-        # Tokenize full document to check length
         doc_tokens = self.tokenizer.encode(text, add_special_tokens=False)
         num_tokens = len(doc_tokens)
         
-        # Case 1: Short document - single prediction
         if num_tokens <= max_chunk_tokens:
             predicted_class, confidence = self._predict_single_chunk(text)
             
@@ -639,37 +583,30 @@ class InstructionFineTuner:
             
             return self.id2class[predicted_class], answer, confidence, chunk_info
         
-        # Case 2: Long document - chunk and vote
         if hasattr(self, 'logger'):
             self.logger.info(f"Long document ({num_tokens} tokens) - using chunking strategy")
         
-        # Create chunks with overlap
         chunks = []
         chunk_predictions = []
         chunk_confidences = []
         
         start_idx = 0
         while start_idx < num_tokens:
-            # Extract chunk
             end_idx = min(start_idx + max_chunk_tokens, num_tokens)
             chunk_tokens = doc_tokens[start_idx:end_idx]
             chunk_text = self.tokenizer.decode(chunk_tokens, skip_special_tokens=True)
             chunks.append(chunk_text)
             
-            # Predict on chunk
             pred_class, confidence = self._predict_single_chunk(chunk_text)
             chunk_predictions.append(pred_class)
             chunk_confidences.append(confidence)
             
-            # Move to next chunk
             if end_idx >= num_tokens:
                 break
             start_idx += (max_chunk_tokens - overlap_tokens)
         
-        # OR Voting: If ANY chunk predicts AI (1) -> Final is AI (1)
         final_prediction = 1 if any(chunk_predictions) else 0
         
-        # Confidence: Use max confidence among chunks that match final prediction
         matching_confidences = [
             conf for pred, conf in zip(chunk_predictions, chunk_confidences)
             if pred == final_prediction
@@ -723,7 +660,6 @@ class InstructionFineTuner:
         
         self.logger.info("Starting test set evaluation with chunking strategy...")
         
-        # Get predictions for all test samples
         test_df = self.dataset['test'].to_pandas()
         predictions = []
         confidences = []
@@ -744,12 +680,10 @@ class InstructionFineTuner:
                 print(f"  Progress: {idx}/{len(test_df)}")
                 self.logger.info(f"  Progress: {idx}/{len(test_df)}")
             
-            # Predict with chunking
             predicted_label, answer, confidence, chunk_info = self.predict_text(row['text'])
             predictions.append(1 if predicted_label == 'ai' else 0)
             confidences.append(confidence)
             
-            # Track chunking statistics
             if chunk_info['used_chunking']:
                 chunk_stats['chunked_docs'] += 1
                 chunk_stats['total_chunks'] += chunk_info['num_chunks']
@@ -758,7 +692,6 @@ class InstructionFineTuner:
                 chunk_stats['single_chunk_docs'] += 1
                 chunk_stats['total_chunks'] += 1
         
-        # Print chunking statistics
         print(f"\n📊 Chunking Statistics:")
         print(f"   Total documents: {chunk_stats['total_docs']}")
         print(f"   Single-chunk docs: {chunk_stats['single_chunk_docs']} "
@@ -771,7 +704,6 @@ class InstructionFineTuner:
         
         self.logger.info(f"Chunking stats: {chunk_stats}")
         
-        # Compute detailed metrics
         print("\nClassification Report:")
         report = classification_report(true_labels, predictions, 
                                     target_names=['non-AI', 'AI'], digits=4)
@@ -792,12 +724,10 @@ class InstructionFineTuner:
         self.logger.info(f"Actual non-AI   {cm[0,0]:<9} {cm[0,1]}")
         self.logger.info(f"Actual AI       {cm[1,0]:<9} {cm[1,1]}")
         
-        # Compute overall accuracy
         accuracy = accuracy_score(true_labels, predictions)
         print(f"\nOverall Accuracy: {accuracy:.4f}")
         self.logger.info(f"Overall Accuracy: {accuracy:.4f}")
         
-        # Compute ROC-AUC score
         try:
             roc_auc = roc_auc_score(true_labels, confidences)
             print(f"ROC-AUC Score: {roc_auc:.4f}")
@@ -807,7 +737,6 @@ class InstructionFineTuner:
             print(f"⚠️ Could not compute ROC-AUC: {e}")
             self.logger.warning(f"Could not compute ROC-AUC: {e}")
         
-        # Confidence analysis
         print(f"\n📊 Confidence Analysis:")
         self.logger.info("Confidence Analysis:")
         
@@ -833,7 +762,6 @@ class InstructionFineTuner:
         self.logger.info(f"  Correct: {len(correct_predictions)}/{len(predictions)} ({len(correct_predictions)/len(predictions)*100:.1f}%)")
         self.logger.info(f"  Incorrect: {len(incorrect_predictions)}/{len(predictions)} ({len(incorrect_predictions)/len(predictions)*100:.1f}%)")
         
-        # Compute per-class metrics
         precision, recall, f1, _ = precision_recall_fscore_support(
             true_labels, predictions, labels=[0, 1], zero_division=0
         )
@@ -884,7 +812,6 @@ class InstructionFineTuner:
     
     def run_full_pipeline(self):
         """Execute the complete training pipeline"""
-        # Setup logging first
         self.setup_environment()
         self.setup_logging()
         
@@ -898,47 +825,41 @@ class InstructionFineTuner:
         
         self.setup_wandb()
         
-        # Data preparation
         self.load_data()
         self.setup_tokenizer()
         self.tokenize_dataset()
         
-        # Model setup
         self.load_model()
         self.setup_lora()
         
-        # Training
         self.setup_trainer()
         self.train()
         
-        # Save model
         self.save_model()
         
-        # Testing
         self.test_predictions()
         test_metrics = self.evaluate_test_set()
         
         # Notifications
         notification_message = f"""
-            🎉 *Instruction Fine-Tuning Completed!*
+             *IT Fine-Tuning Completed.
 
-            📊 *Final Results:*
+             Final Results:-
             - Epochs completed: {self.trainer.state.epoch}
             - Overall Accuracy: {test_metrics['accuracy']:.4f}
-            - ROC-AUC: {test_metrics['roc_auc']:.4f if test_metrics['roc_auc'] else 'N/A'}
+            - ROC-AUC: {f"{test_metrics['roc_auc']:.4f}" if test_metrics['roc_auc'] is not None else 'N/A'}
             - AI Recall: {test_metrics['ai_recall']:.4f}
             - AI Precision: {test_metrics['ai_precision']:.4f}
             - AI F1: {test_metrics['ai_f1']:.4f}
             - Mean Confidence (Correct): {test_metrics['mean_confidence_correct']:.4f}
             - Mean Confidence (Incorrect): {test_metrics['mean_confidence_incorrect']:.4f}
 
-            💾 *Model saved to:* `{self.config['output']['model_dir']}`
+            Model saved to: `{self.config['output']['model_dir']}`
 
 
             """
         self.notify_slack(notification_message)
         
-        # Log to wandb
         if self.config['wandb']['enabled']:
             wandb.log({
                 "final/ai_recall": test_metrics['ai_recall'],
@@ -947,10 +868,9 @@ class InstructionFineTuner:
             })
             wandb.finish()
         
-        print("\n✅ Training and evaluation complete!")
-        print(f"💾 Model saved to: {self.config['output']['model_dir']}")
+        print("\n Training and evaluation complete!")
+        print(f" Model saved to: {self.config['output']['model_dir']}")
         
-        # Final logging summary
         self.logger.info("="*80)
         self.logger.info("="*80)
         self.logger.info(f"Final Results:")
