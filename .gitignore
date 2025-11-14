@@ -5,7 +5,6 @@ data/
 # Models
 models/*
 !models/.gitkeep
-outputs/checkpoints/*
 outputs/tensorboard/*
 outputs/logs/*
 

@@ -1,5 +1,0 @@
-dataset,optimization_goal,threshold,accuracy,ai_precision,ai_recall,ai_f1,nonai_precision,nonai_recall,nonai_f1,true_negatives,false_positives,false_negatives,true_positives
-in_dist_negativeood_fineweb_ai_negative,Current (0.5),0.5,0.9438565915598157,0.0,0.0,0.0,1.0,0.9438565915598157,0.9711175152097342,7582.0,451.0,0.0,0.0
-in_dist_negativeood_fineweb_ai_negative,Best Recall,0.1,0.6305240881364372,0.0,0.0,0.0,1.0,0.6305240881364372,0.773400519163231,5065.0,2968.0,0.0,0.0
-in_dist_negativeood_fineweb_ai_negative,Best F1,0.1,0.6305240881364372,0.0,0.0,0.0,1.0,0.6305240881364372,0.773400519163231,5065.0,2968.0,0.0,0.0
-in_dist_negativeood_fineweb_ai_negative,Best Accuracy,0.9000000000000002,0.9897921075563302,0.0,0.0,0.0,1.0,0.9897921075563302,0.9948698698698699,7951.0,82.0,0.0,0.0

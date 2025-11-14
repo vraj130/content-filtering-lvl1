@@ -13,6 +13,7 @@ import wandb
 import requests
 import json
 from dotenv import load_dotenv
+from huggingface_hub import HfApi, create_repo
 
 from datasets import Dataset, DatasetDict
 from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
@@ -461,7 +462,7 @@ class InstructionFineTuner:
             save_strategy=self.config['training']['save_strategy'],
             save_steps=self.config['training']['save_steps'],
             load_best_model_at_end=self.config['training']['load_best_model_at_end'],
-            push_to_hub=self.config['training']['push_to_hub'],
+            push_to_hub=False,  # Disabled - we handle push manually with custom branch logic
             report_to=["tensorboard", "wandb"] if self.config['wandb']['enabled'] else ["tensorboard"],
             logging_dir=self.config['output']['tensorboard_dir'],
             logging_strategy=self.config['training']['logging_strategy'],
@@ -512,6 +513,69 @@ class InstructionFineTuner:
         self.tokenizer.save_pretrained(output_dir)
         print(f"Model saved to {output_dir}")
         self.logger.info(f"Model saved to {output_dir}")
+    
+    def push_to_huggingface_hub(self):
+        """Push the trained model to HuggingFace Hub on the specified branch"""
+        if not self.config['training'].get('push_to_hub', False):
+            self.logger.info("push_to_hub is disabled, skipping HuggingFace Hub push")
+            return
+        
+        hf_config = self.config.get('hf_hub', {})
+        repo_id = hf_config.get('repo_id')
+        branch = hf_config.get('branch', 'main')
+        token = os.getenv(hf_config.get('token', '').replace('${', '').replace('}', '')) if '${' in hf_config.get('token', '') else hf_config.get('token')
+        
+        if not repo_id:
+            self.logger.warning("No repo_id specified in hf_hub config, skipping push")
+            print("⚠️ No repo_id specified, skipping HuggingFace Hub push")
+            return
+        
+        if not token:
+            self.logger.warning("No HF token found, skipping push")
+            print("⚠️ No HF_TOKEN found, skipping HuggingFace Hub push")
+            return
+        
+        try:
+            print(f"\n📤 Pushing model to HuggingFace Hub...")
+            print(f"   Repository: {repo_id}")
+            print(f"   Branch: {branch}")
+            self.logger.info(f"Pushing model to HuggingFace Hub: {repo_id} (branch: {branch})")
+            
+            api = HfApi()
+            
+            # Ensure the repository exists
+            try:
+                api.repo_info(repo_id=repo_id, repo_type="model", token=token)
+                print(f"✅ Repository exists: {repo_id}")
+            except Exception:
+                print(f"📦 Creating repository: {repo_id}")
+                create_repo(repo_id=repo_id, repo_type="model", token=token, exist_ok=True)
+                self.logger.info(f"Created repository: {repo_id}")
+            
+            # Push the model to the specified branch
+            model_dir = self.config['output']['model_dir']
+            
+            print(f"   Uploading model files from: {model_dir}")
+            self.logger.info(f"Uploading from: {model_dir}")
+            
+            api.upload_folder(
+                folder_path=model_dir,
+                repo_id=repo_id,
+                repo_type="model",
+                revision=branch,
+                token=token,
+                commit_message=f"Upload model from training run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+            print(f"✅ Successfully pushed model to {repo_id} on branch '{branch}'")
+            print(f"🔗 View at: https://huggingface.co/{repo_id}/tree/{branch}")
+            self.logger.info(f"Successfully pushed model to {repo_id} on branch '{branch}'")
+            
+        except Exception as e:
+            error_msg = f"Failed to push model to HuggingFace Hub: {e}"
+            print(f"❌ {error_msg}")
+            self.logger.error(error_msg)
+            # Don't raise exception, just log and continue
     
     def _predict_single_chunk(self, text_chunk):
 
@@ -836,6 +900,9 @@ class InstructionFineTuner:
         self.train()
         
         self.save_model()
+        
+        # Push to HuggingFace Hub if enabled
+        self.push_to_huggingface_hub()
         
         self.test_predictions()
         test_metrics = self.evaluate_test_set()
