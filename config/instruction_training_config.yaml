@@ -42,8 +42,8 @@ quantization:
 
 # LoRA Configuration
 lora:
-  r: 8
-  lora_alpha: 16
+  r: 16
+  lora_alpha: 32
   lora_dropout: 0.2
   bias: "none"
   task_type: "CAUSAL_LM" 
@@ -56,23 +56,36 @@ lora:
     - "o_proj"
     - "up_proj"
 
+wandb:
+  enabled: true
+  project: "gemma-chat-template"
+  run_name: "gemma-v1-1116"
+  api_key: ${WANDB_API_KEY}
+
+hf_hub:
+  repo_id: "metr-evals/content-filtering-models"
+  repo_type: "model"
+  branch: "gemma-v1-chat-template-1116"
+  token: ${HF_TOKEN}  # Optional: use environment variable for authentication
+
+
 # Training Arguments
 training:
-  checkpoint_name: "gemma3_20k_balanced_it"
-  output_dir: "outputs/checkpoints/${{checkpoint_name}}/checkpoints"
-  learning_rate: 2.0e-5  # Lower LR for instruction tuning
+  checkpoint_name: "gemma-v1-chat-template-1116"
+  output_dir: "outputs/checkpoints/gemma-v1-chat-template-1116/checkpoints"
+  learning_rate: 2.0e-4  
   per_device_train_batch_size: 1
-  per_device_eval_batch_size: 2
+  per_device_eval_batch_size: 1
   num_train_epochs: 1
   weight_decay: 0.01
   eval_strategy: "steps"
-  eval_steps: 1500
+  eval_steps: 796
   save_strategy: "steps"
-  save_steps: 1500
+  save_steps: 398
   load_best_model_at_end: true
-  push_to_hub: false
+  push_to_hub: true
   logging_strategy: "steps"
-  logging_steps: 100
+  logging_steps: 25
   gradient_accumulation_steps: 4
   bf16: true
   fp16: false
@@ -84,29 +97,27 @@ training:
   dataloader_pin_memory: true
   dataloader_prefetch_factor: 2
 
+
+# Output Configuration
+output:
+  model_dir: "outputs/checkpoints/gemma-v1-chat-template-1116/final_model"
+  tensorboard_dir: "outputs/tensorboard/gemma-v1-chat-template-1116"
+
+
 # Early Stopping
 early_stopping:
   patience: 1
   threshold: 0.001
 
-# Output Configuration
-output:
-  model_dir: "outputs/checkpoints/${checkpoint_name}/final_model"
-  tensorboard_dir: "outputs/tensorboard/${checkpoint_name}"
 
 # Data Configuration
 data:
-  data_dir: "/workspace/content-filtering-lvl1/data/final_data_4/train_all_data"
+  data_dir: "/workspace/content-filtering-lvl1/data/final_data_4_v2/train_all_data"
   train_file: "train.parquet"
   val_file: "val.parquet"
   test_file: "test.parquet"
 
 # Weights & Biases Configuration
-wandb:
-  enabled: true
-  project: "gemma-v3-20k-it"
-  run_name: "gemma3-1b-20k-balanced-it"
-  api_key: ${WANDB_API_KEY}
 
 # Slack Notifications
 slack:

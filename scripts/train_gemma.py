@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CLI script to train the Gemma3 instruction-based classifier
-Usage: python scripts/train_instruction.py --config config/instruction_training_config.yaml
+Usage: python scripts/train_gemma.py --config config/instruction_training_config.yaml
 """
 
 import argparse

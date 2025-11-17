@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Parquet Testing Script for Instruction-Tuned Gemma Model
-Processes parquet files and saves predictions with LoRA adapter
+Parquet Testing Script for ModernBERT Classification Model
+Processes parquet files using logits-based classification predictions
 """
 
 import os
@@ -13,16 +13,15 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from tqdm.auto import tqdm
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from peft import PeftModel
-import re
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import confusion_matrix
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
 class ParquetTester:
-    """Process parquet files with instruction-tuned model predictions"""
+    """Process parquet files with ModernBERT classification predictions"""
     
     def __init__(self, config_path, model_path):
         self.config_path = config_path
@@ -45,7 +44,7 @@ class ParquetTester:
         print(f"🖥️  Using device: {self.device}")
     
     def load_model(self):
-        """Load trained model and tokenizer"""
+        """Load trained ModernBERT classification model and tokenizer"""
         print(f"\n🤖 Loading model from: {self.model_path}")
         
         # Load tokenizer
@@ -59,112 +58,64 @@ class ParquetTester:
         
         print("✅ Tokenizer loaded")
         
-        # Load base model with quantization
-        base_model_id = self.config['model']['hugging_face_model_id']
-        print(f"🔧 Loading base model: {base_model_id}")
+        # Load classification model
+        print(f"🔧 Loading ModernBERT classification model...")
         
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=self.config['quantization']['load_in_4bit'],
-            bnb_4bit_use_double_quant=self.config['quantization']['bnb_4bit_use_double_quant'],
-            bnb_4bit_quant_type=self.config['quantization']['bnb_4bit_quant_type'],
-            bnb_4bit_compute_dtype=getattr(torch, self.config['quantization']['bnb_4bit_compute_dtype'])
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self.model_path,
+            torch_dtype=torch.bfloat16 if self.config['training']['bf16'] else torch.float32,
+            device_map="auto"
         )
         
-        base_model = AutoModelForCausalLM.from_pretrained(
-            base_model_id,
-            quantization_config=bnb_config,
-            device_map="auto",
-            torch_dtype=torch.bfloat16,
-        )
-        
-        # Load LoRA adapter
-        print("🔌 Loading LoRA adapter...")
-        self.model = PeftModel.from_pretrained(base_model, self.model_path)
         self.model.eval()
         
-        print("✅ Model loaded successfully\n")
-    
-    def create_prompt(self, text):
-        """Create instruction prompt (same as training)"""
-        prompt_template = self.config['instruction']['prompt_template']
-        text = re.sub(r'\n', ' ', text.strip())
-        prompt = prompt_template.format(text=text)
-        return prompt
+        print("✅ Model loaded successfully")
+        
+        # Print model info
+        total_params = sum(p.numel() for p in self.model.parameters())
+        print(f"   Total parameters: {total_params:,}")
+        print(f"   Number of labels: {self.model.config.num_labels}")
+        print(f"   Label mapping: {self.model.config.id2label}\n")
     
     def predict_single(self, text, threshold=0.5):
         """
-        Predict class for a single text
+        Predict class for a single text using classification head
         
         Args:
             text: Input text
             threshold: Classification threshold for AI probability
         
         Returns:
-            predicted_class (0 or 1), ai_probability (float), confidence (float), 
-            answer_token (str)
+            predicted_class (0 or 1), ai_probability (float), nonai_probability (float),
+            confidence (float), ai_logit (float), nonai_logit (float)
         """
-        # Create prompt (no normalization - use raw text)
-        prompt = self.create_prompt(text)
-
-
-        # print('='*80)
-        # print(prompt[:200])
-        # print('='*80)
-        
         # Tokenize
         inputs = self.tokenizer(
-            prompt,
+            text,
             return_tensors="pt",
             truncation=True,
-            max_length=8192
+            max_length=self.config['model']['max_length']
         ).to(self.device)
         
-        # Get token IDs for Yes/No
-        yes_tokens = self.tokenizer.encode("Yes", add_special_tokens=False)
-        no_tokens = self.tokenizer.encode("No", add_special_tokens=False)
-        yes_token_id = yes_tokens[0]
-        no_token_id = no_tokens[0]
-        
-        # Generate
+        # Get logits from classification head
         with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=1,
-                output_scores=True,
-                return_dict_in_generate=True,
-                pad_token_id=self.tokenizer.pad_token_id,
-                do_sample=False
-            )
+            outputs = self.model(**inputs)
+            logits = outputs.logits[0]  # Shape: [2]
         
-        generated_ids = outputs.sequences[0]
-        input_length = inputs.input_ids.shape[1]
-        generated_text = self.tokenizer.decode(generated_ids[input_length:], skip_special_tokens=True)
-        # print(f"\n{'='*80}")
-        # print(f"DEBUG - Full Generated Output: '{generated_text}'")
-        # print(f"{'='*80}\n")
-
-        # Get logits for Yes/No tokens
-        first_token_logits = outputs.scores[0][0]
-        yes_score = first_token_logits[yes_token_id].item()
-        no_score = first_token_logits[no_token_id].item()
+        # Extract logits for both classes
+        nonai_logit = logits[0].item()  # Class 0 = non-AI
+        ai_logit = logits[1].item()      # Class 1 = AI
         
-
         # Calculate probabilities
-        probs = F.softmax(torch.tensor([no_score, yes_score]), dim=0)
-        yes_prob = probs[1].item()  # AI probability
-
-        # print('='*80)
-        # print("PROBS", probs)
-        # print("YES PROB", yes_prob)
-        # print("NO PROB", 1 - yes_prob)
-        # print('='*80)
-
-        # Predict using threshold on probability
-        predicted_class = 1 if yes_prob >= threshold else 0
-        confidence = yes_prob if predicted_class == 1 else (1 - yes_prob)
-        answer_token = "Yes" if predicted_class == 1 else "No"
-
-        return predicted_class, yes_prob, confidence, answer_token
+        probs = F.softmax(logits, dim=0)
+        nonai_probability = probs[0].item()
+        ai_probability = probs[1].item()
+        
+        # Predict class using threshold on probability
+        predicted_class = 1 if ai_probability >= threshold else 0
+        confidence = probs[predicted_class].item()
+        
+        return predicted_class, ai_probability, nonai_probability, confidence, ai_logit, nonai_logit
     
     def process_parquet(self, parquet_path, threshold=0.5):
         """
@@ -178,7 +129,7 @@ class ParquetTester:
             DataFrame with predictions
         """
         print("="*80)
-        print("PARQUET PROCESSING MODE")
+        print("PARQUET PROCESSING MODE - ModernBERT Classification")
         print("="*80)
         print(f"Input file: {parquet_path}")
         print(f"Classification threshold: {threshold}")
@@ -206,7 +157,7 @@ class ParquetTester:
             true_label = row.get('label', None)
             
             # Run prediction
-            pred_class, ai_prob, confidence, answer = self.predict_single(text, threshold=threshold)
+            pred_class, ai_prob, nonai_prob, confidence, ai_logit, nonai_logit = self.predict_single(text, threshold=threshold)
             
             # Calculate if correct
             is_correct = None
@@ -222,15 +173,13 @@ class ParquetTester:
                 'true_label': true_label,
                 'predicted_label': pred_class,
                 'ai_probability': ai_prob,
+                'nonai_probability': nonai_prob,
                 'confidence': confidence,
-                'answer_token': answer,
+                'ai_logit': ai_logit,
+                'nonai_logit': nonai_logit,
                 'is_correct': is_correct,
             }
             results.append(result)
-
-            # print('='*80)
-            # print("Predicted label: ", pred_class)
-            
         
         # Create results dataframe
         results_df = pd.DataFrame(results)
@@ -245,6 +194,17 @@ class ParquetTester:
             accuracy = correct_count / total_with_labels
             print(f"Samples with labels: {total_with_labels:,}")
             print(f"Correct predictions: {correct_count:,}/{total_with_labels:,} ({accuracy*100:.2f}%)")
+            
+            # Confusion Matrix
+            true_labels = results_df[results_df['true_label'].notna()]['true_label'].astype(int).tolist()
+            pred_labels = results_df[results_df['true_label'].notna()]['predicted_label'].astype(int).tolist()
+            cm = confusion_matrix(true_labels, pred_labels, labels=[0, 1])
+            
+            print(f"\nConfusion Matrix:")
+            print(f"                Predicted")
+            print(f"                Non-AI    AI")
+            print(f"Actual Non-AI   {cm[0,0]:<9} {cm[0,1]}")
+            print(f"Actual AI       {cm[1,0]:<9} {cm[1,1]}")
         
         # Count predictions
         ai_count = (results_df['predicted_label'] == 1).sum()
@@ -255,9 +215,17 @@ class ParquetTester:
         
         # Average metrics
         avg_ai_prob = results_df['ai_probability'].mean()
+        avg_nonai_prob = results_df['nonai_probability'].mean()
         avg_confidence = results_df['confidence'].mean()
         print(f"\nAverage AI probability: {avg_ai_prob:.4f}")
+        print(f"Average Non-AI probability: {avg_nonai_prob:.4f}")
         print(f"Average confidence: {avg_confidence:.4f}")
+        
+        # Logit statistics
+        avg_ai_logit = results_df['ai_logit'].mean()
+        avg_nonai_logit = results_df['nonai_logit'].mean()
+        print(f"\nAverage AI logit: {avg_ai_logit:.4f}")
+        print(f"Average Non-AI logit: {avg_nonai_logit:.4f}")
         
         print("="*80)
         
@@ -297,7 +265,7 @@ def main():
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description='Process parquet file with instruction-tuned model predictions'
+        description='Process parquet file with ModernBERT classification predictions'
     )
     parser.add_argument(
         '--input',
@@ -308,13 +276,13 @@ def main():
     parser.add_argument(
         '--config',
         type=str,
-        default='config/instruction_training_config.yaml',
+        default='config/modernbert_training_config.yaml',
         help='Path to config file'
     )
     parser.add_argument(
         '--model',
         type=str,
-        default='outputs/checkpoints/gemma3_20k_balanced_it_v2/final_model',
+        default='outputs/checkpoints/modernbert_large_1114/final_model',
         help='Path to trained model'
     )
     parser.add_argument(
@@ -332,14 +300,14 @@ def main():
     parser.add_argument(
         '--name',
         type=str,
-        default='predictions',
+        default='modernbert_predictions',
         help='Base name for output files'
     )
     
     args = parser.parse_args()
     
     print(f"{'='*80}")
-    print(f"PARQUET PREDICTION PROCESSING")
+    print(f"MODERNBERT PARQUET PREDICTION PROCESSING")
     print(f"{'='*80}")
     print(f"Input: {args.input}")
     print(f"Model: {args.model}")
@@ -367,6 +335,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 

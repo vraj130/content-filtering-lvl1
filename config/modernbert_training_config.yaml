@@ -1,0 +1,84 @@
+# Training Configuration for Content Filtering LV1 - ModernBERT Classification
+# Stage 1: High-recall AI content detection using encoder-based classification
+
+# Model Configuration
+model:
+  hugging_face_model_id: "answerdotai/ModernBERT-large"
+  max_length: 8192  # ModernBERT's context length
+  attention_implementation: "flash_attention_2"
+
+quick_test: false
+
+# Class Labels
+class_mapping:
+  nonai: 0
+  ai: 1
+
+# GPU Configuration
+gpu:
+  graphic_card: "0"
+  gpu_device: "cuda:0"
+
+# Weights & Biases Configuration
+wandb:
+  enabled: true
+  project: "modernbert-lvl1-filtering-1116"
+  run_name: "modernbert-large-v1"
+  api_key: ${WANDB_API_KEY}
+
+# HuggingFace Hub Configuration
+hf_hub:
+  repo_id: "metr-evals/content-filtering-modernBERT"
+  repo_type: "model"
+  branch: "modernbert-large-v1-1116"
+  token: ${HF_TOKEN}
+
+# Training Arguments
+training:
+  checkpoint_name: "modernbert_large_v1_1116"
+  output_dir: "outputs/checkpoints/modernbert_large_v1_1116/checkpoints"
+  learning_rate: 2.0e-5  # Lower learning rate for full fine-tuning
+  per_device_train_batch_size: 8  # Adjust based on GPU memory
+  per_device_eval_batch_size: 8
+  num_train_epochs: 1  # More epochs for full fine-tuning
+  weight_decay: 0.01
+  eval_strategy: "steps"
+  eval_steps: 500
+  save_strategy: "steps"
+  save_steps: 500
+  load_best_model_at_end: true
+  push_to_hub: true
+  logging_strategy: "steps"
+  logging_steps: 50
+  gradient_accumulation_steps: 4
+  bf16: true
+  fp16: false
+  warmup_ratio: 0.1
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  dataloader_prefetch_factor: 2
+
+# Output Configuration
+output:
+  model_dir: "outputs/checkpoints/modernbert_large_1114/final_model"
+  tensorboard_dir: "outputs/tensorboard/modernbert_large_1116"
+
+# Early Stopping
+early_stopping:
+  patience: 3
+  threshold: 0.001
+
+# Data Configuration
+data:
+  data_dir: "/workspace/content-filtering-lvl1/data/final_data_4_v2/train_all_data"
+  train_file: "train.parquet"
+  val_file: "val.parquet"
+  test_file: "test.parquet"
+
+# Slack Notifications
+slack:
+  enabled: true
+  webhook_url: ${SLACK_WEBHOOK_URL}
+
