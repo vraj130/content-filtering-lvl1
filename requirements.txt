@@ -11,3 +11,6 @@ pandas
 pyyaml
 wandb
 requests
+openai
+tqdm
+fasttext

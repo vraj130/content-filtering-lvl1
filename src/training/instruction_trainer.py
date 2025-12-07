@@ -686,40 +686,23 @@ class InstructionFineTuner:
             
             api = HfApi()
             
-            # Check if repository exists
-            try:
-                api.repo_info(repo_id=repo_id, repo_type="model", token=token)
-                print(f"✅ Repository exists: {repo_id}")
-            except Exception as e:
-                # If we get a 404, repo doesn't exist. If 403, we don't have read access but it might exist
-                if "404" in str(e):
-                    print(f"📦 Creating repository: {repo_id}")
-                    try:
-                        create_repo(repo_id=repo_id, repo_type="model", token=token, exist_ok=True)
-                        print(f"✅ Repository created: {repo_id}")
-                        self.logger.info(f"Created repository: {repo_id}")
-                    except Exception as create_error:
-                        print(f"⚠️ Could not create repository: {create_error}")
-                        print(f"💡 Assuming repository exists, continuing with upload...")
-                        self.logger.warning(f"Could not create repository, continuing anyway: {create_error}")
-                else:
-                    # Might be 403 or other error - assume repo exists and try to upload
-                    print(f"⚠️ Could not verify repository (might be permission issue)")
-                    print(f"💡 Assuming repository exists and attempting upload...")
-                    self.logger.warning(f"Could not verify repository: {e}")
-            
-            # Create branch if it doesn't exist (for non-main branches)
+            # Create branch if needed (for non-main branches)
             if branch != "main":
                 try:
-                    print(f"🌿 Creating branch '{branch}' (if it doesn't exist)...")
-                    api.create_branch(repo_id=repo_id, branch=branch, repo_type="model", token=token)
-                    print(f"✅ Branch '{branch}' ready")
+                    print(f"🌿 Creating branch '{branch}' from main...")
+                    api.create_branch(
+                        repo_id=repo_id, 
+                        branch=branch, 
+                        repo_type="model", 
+                        token=token,
+                        revision="main"
+                    )
+                    print(f"✅ Branch '{branch}' created")
                 except Exception as branch_error:
                     if "already exists" in str(branch_error).lower() or "reference already exists" in str(branch_error).lower():
                         print(f"✅ Branch '{branch}' already exists")
                     else:
-                        print(f"⚠️ Note: {branch_error}")
-                        print(f"💡 Continuing with upload anyway...")
+                        print(f"ℹ️  Branch note: {branch_error}")
             
             # Push the model to the specified branch
             model_dir = self.config['output']['model_dir']

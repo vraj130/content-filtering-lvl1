@@ -1,0 +1,38 @@
+# FastText Training Configuration for Content Filtering
+# Binary Classification: AI vs non-AI content
+
+# Class Labels (consistent with existing project)
+class_mapping:
+  nonai: 0
+  ai: 1
+
+# Training Hyperparameters
+training:
+  epochs: 25              # Number of training epochs
+  lr: 0.5                 # Learning rate (0.1-1.0 typical for fastText)
+  wordNgrams: 2           # Max word n-gram length (2-3 recommended)
+  dim: 100                # Dimension of word embeddings
+  loss: "softmax"         # Loss function: softmax or hs (hierarchical softmax)
+  minCount: 1             # Min word occurrence to include in vocabulary
+  bucket: 2000000         # Number of buckets for hashing n-grams
+
+# Data Configuration
+data:
+  data_dir: "data/content_filtering_dataset_fasttext"
+  train_file: "train.txt"
+  val_file: "val.txt"
+  test_file: "test.txt"
+
+# Output Configuration
+output:
+  model_dir: "models/fasttext"
+  metrics_dir: "outputs/fasttext"
+  log_dir: "outputs/logs"
+
+# Evaluation Settings
+evaluation:
+  # Threshold for binary classification (default 0.5)
+  default_threshold: 0.5
+  # Target recall for threshold optimization
+  target_ai_recall: 0.95
+

@@ -1,0 +1,41 @@
+[project]
+name = "content-filtering-lvl1"
+version = "0.1.0"
+description = "Content filtering model training and inference"
+requires-python = ">=3.10"
+dependencies = [
+    "vllm",
+    "transformers",
+    "accelerate",
+    "hf-transfer",
+    "sentencepiece",
+    "einops",
+    "pandas"
+]
+
+[project.optional-dependencies]
+inference = [
+    "vllm>=0.6.0",
+    "sentencepiece>=0.2.0",
+    "einops>=0.8.0",
+    "hf-transfer>=0.1.8",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.7.0",
+]
+
+
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "ruff>=0.7.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

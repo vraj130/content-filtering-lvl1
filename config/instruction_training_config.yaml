@@ -59,27 +59,27 @@ lora:
 wandb:
   enabled: true
   project: "gemma-chat-template"
-  run_name: "gemma-v1-1116"
+  run_name: "gemma-v2-1117"
   api_key: ${WANDB_API_KEY}
 
 hf_hub:
   repo_id: "metr-evals/content-filtering-models"
   repo_type: "model"
-  branch: "gemma-v1-chat-template-1116"
+  branch: "gemma-v2-chat-template-1117"
   token: ${HF_TOKEN}  # Optional: use environment variable for authentication
 
 
 # Training Arguments
 training:
-  checkpoint_name: "gemma-v1-chat-template-1116"
-  output_dir: "outputs/checkpoints/gemma-v1-chat-template-1116/checkpoints"
+  checkpoint_name: "gemma-v2-chat-template-1117"
+  output_dir: "outputs/checkpoints/gemma-v2-chat-template-1117/checkpoints"
   learning_rate: 2.0e-4  
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   num_train_epochs: 1
   weight_decay: 0.01
   eval_strategy: "steps"
-  eval_steps: 796
+  eval_steps: 398
   save_strategy: "steps"
   save_steps: 398
   load_best_model_at_end: true
@@ -100,8 +100,8 @@ training:
 
 # Output Configuration
 output:
-  model_dir: "outputs/checkpoints/gemma-v1-chat-template-1116/final_model"
-  tensorboard_dir: "outputs/tensorboard/gemma-v1-chat-template-1116"
+  model_dir: "outputs/checkpoints/gemma-v2-chat-template-1117/final_model"
+  tensorboard_dir: "outputs/tensorboard/gemma-v2-chat-template-1117"
 
 
 # Early Stopping
@@ -112,7 +112,7 @@ early_stopping:
 
 # Data Configuration
 data:
-  data_dir: "/workspace/content-filtering-lvl1/data/final_data_4_v2/train_all_data"
+  data_dir: "/workspace/content-filtering-lvl1/data/content_filtering_dataset"
   train_file: "train.parquet"
   val_file: "val.parquet"
   test_file: "test.parquet"

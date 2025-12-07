@@ -1,0 +1,56 @@
+{
+  "name": "Content Filtering Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "runArgs": [
+    "--gpus", "all",
+    "--shm-size", "16g"
+  ],
+  "containerEnv": {
+    "PYTHONUNBUFFERED": "1",
+    "HF_HOME": "/workspace/.cache/huggingface",
+    "WANDB_DIR": "/workspace/.cache/wandb"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "source=${localEnv:HOME}/.cache/huggingface,target=/workspace/.cache/huggingface,type=bind"
+  ],
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "uv sync",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anysphere.python",
+        "charliermarsh.ruff",
+        "anysphere.jupyter",
+        "eamodio.gitlens",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/workspace/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "ruff.path": ["/workspace/.venv/bin/ruff"]
+      }
+    }
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "vLLM Server",
+      "onAutoForward": "notify"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  }
+}
+
