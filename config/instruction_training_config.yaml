@@ -74,8 +74,8 @@ training:
   checkpoint_name: "gemma-v2-chat-template-1117"
   output_dir: "outputs/checkpoints/gemma-v2-chat-template-1117/checkpoints"
   learning_rate: 2.0e-4  
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 2
   num_train_epochs: 1
   weight_decay: 0.01
   eval_strategy: "steps"
@@ -86,7 +86,7 @@ training:
   push_to_hub: true
   logging_strategy: "steps"
   logging_steps: 25
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 1
   bf16: true
   fp16: false
   warmup_ratio: 0.1

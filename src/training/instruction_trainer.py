@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass
 from typing import Any, Dict, List
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
 import wandb
 import requests
 import json
@@ -128,9 +128,9 @@ class InstructionFineTuner:
         
         self.config = config
         self.device = None
-        self.tokenizer = None
-        self.model = None
-        self.trainer = None
+        self.tokenizer: PreTrainedTokenizerBase | None = None
+        self.model: PreTrainedModel | None = None
+        self.trainer: Trainer | None = None
         self.dataset = None
         self.dataset_tokenized = None
         self.class2id = config['class_mapping']
@@ -458,8 +458,13 @@ class InstructionFineTuner:
         print(f"   r={self.config['lora']['r']}, alpha={self.config['lora']['lora_alpha']}")
         print(f"   Task type: {self.config['lora']['task_type']}")
         
-        self.model.gradient_checkpointing_enable()
-        self.model = prepare_model_for_kbit_training(self.model)
+        if self.config['quantization']['load_in_4bit']:
+            self.model = prepare_model_for_kbit_training(self.model)
+            self.logger.info("Gradient checkpointing enabled, model prepared for k-bit training")
+        else:
+            self.model.gradient_checkpointing_enable(use_reentrant=False)
+            self.logger.info("Gradient checkpointing enabled, model prepared for k-bit training")
+        
         self.logger.info("Gradient checkpointing enabled, model prepared for k-bit training")
         
         lora_config = LoraConfig(
