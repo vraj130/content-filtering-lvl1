@@ -757,7 +757,8 @@ class InstructionFineTuner:
                 output_scores=True,
                 return_dict_in_generate=True,
                 pad_token_id=self.tokenizer.pad_token_id,
-                do_sample=False
+                do_sample=False,
+                use_cache=False
             )
         
         first_token_logits = outputs.scores[0][0]
