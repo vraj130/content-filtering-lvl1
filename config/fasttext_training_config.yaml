@@ -25,8 +25,8 @@ data:
 
 # Output Configuration
 output:
-  model_dir: "models/fasttext"
-  metrics_dir: "outputs/fasttext"
+  model_dir: "outputs/fasttext_models"
+  metrics_dir: "outputs/fasttext_results"
   log_dir: "outputs/logs"
 
 # Evaluation Settings

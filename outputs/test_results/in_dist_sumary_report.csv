@@ -1,3 +1,0 @@
-dataset,samples,true_label,accuracy,error_rate,ai_recall,ai_precision,non_ai_recall,non_ai_precision,roc_auc,mean_confidence
-in_dist_negative,8033,Non-AI,0.9492095107680817,0.05079048923191834,0.0,0.0,0.9492095107680817,1.0,,0.8899640953408408
-in_dist_positive,17984,AI,0.8167259786476868,0.18327402135231316,0.8167259786476868,1.0,0.0,0.0,,0.8938741231897465

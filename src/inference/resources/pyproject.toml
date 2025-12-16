@@ -11,6 +11,7 @@ dependencies = [
     "sentencepiece",
     "einops",
     "pandas"
+    "scikit-learn"
 ]
 
 [project.optional-dependencies]

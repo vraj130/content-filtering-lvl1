@@ -350,7 +350,7 @@ class FastTextTrainer:
             raise ValueError("Model not trained yet. Call train() first.")
         
         output_config = self.config.get('output', {})
-        model_dir = output_config.get('model_dir', 'models/fasttext')
+        model_dir = output_config.get('model_dir')
         os.makedirs(model_dir, exist_ok=True)
         
         model_path = os.path.join(model_dir, 'fasttext_model.bin')
@@ -363,7 +363,7 @@ class FastTextTrainer:
     def save_metrics(self, metrics: Dict, split: str = 'val'):
         """Save evaluation metrics to JSON file."""
         output_config = self.config.get('output', {})
-        output_dir = output_config.get('metrics_dir', 'outputs/fasttext')
+        output_dir = output_config.get('metrics_dir', 'outputs/fasttext_results')
         os.makedirs(output_dir, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

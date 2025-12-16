@@ -26,7 +26,8 @@
         "charliermarsh.ruff",
         "anysphere.jupyter",
         "eamodio.gitlens",
-        "tamasfe.even-better-toml"
+        "tamasfe.even-better-toml",
+        "lucien-martijn.parquet-visualizer"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/workspace/.venv/bin/python",

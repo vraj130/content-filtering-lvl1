@@ -19,9 +19,6 @@ python ./scripts/classify_parquet_logprobs.py \
 
 """
 
-
-
-
 import argparse
 import json
 import math
@@ -534,14 +531,14 @@ def print_detailed_summary_tables(
         print("Combined ROC-AUC: nan")
 
     print(
-        f"\n{'Threshold':<12} {'Accuracy':>10} {'AI Recall':>12} {'AI Precision':>14} {'AI F1':>10}"
+        f"\n{'Threshold':<12} {'Accuracy':>10} {'AI Recall':>12} {'AI Prec':>10} {'AI F1':>10} {'NonAI Recall':>14} {'NonAI Prec':>12}"
     )
-    print("-" * 60)
+    print("-" * 95)
 
     for threshold in thresholds:
         m = results[str(threshold)]["combined"]
         print(
-            f"{threshold:<12.1f} {m['accuracy']:>10.4f} {m['ai_recall']:>12.4f} {m['ai_precision']:>14.4f} {m['ai_f1']:>10.4f}"
+            f"{threshold:<12.1f} {m['accuracy']:>10.4f} {m['ai_recall']:>12.4f} {m['ai_precision']:>10.4f} {m['ai_f1']:>10.4f} {m['nonai_recall']:>14.4f} {m['nonai_precision']:>12.4f}"
         )
 
 
